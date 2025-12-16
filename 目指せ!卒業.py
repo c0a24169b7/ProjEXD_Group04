@@ -1,5 +1,6 @@
 import os
 import pygame
+import pyautogui
 import sys
 
 """
@@ -8,8 +9,10 @@ import sys
 #カレントディレクトリへの移動
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-#画面サイズ
-DEFAULT_SIZE: tuple[int, int] = (1000, 800)
+#機器のサイズ
+W, H = pyautogui.size()
+#デフォルトGUIサイズ
+DEFAULT_SIZE: tuple[int, int] = (0, 0)
 
 """
 オブジェクトクラス群
@@ -51,7 +54,6 @@ class Chara(pygame.sprite.Sprite):
         レベルアップイベント
         """
         pass
-    
 
 """
 敵
@@ -95,6 +97,9 @@ class Weapon1(pygame.sprite.Sprite):
     武器
     """
     def __init__(self):
+        """
+        初期化
+        """
         super().__init__()
         
         self.level = 0
@@ -111,14 +116,23 @@ class Weapon1(pygame.sprite.Sprite):
 """
 class Item1(pygame.sprite.Sprite):
     def __init__(self):
+        """
+        初期化
+        """
         super().__init__()
         
         self.image = "path"
     
     def update(self):
+        """
+        描画処理
+        """
         pass
     
     def behavior(self):
+        """
+        挙動
+        """
         pass
 
 """
@@ -134,9 +148,12 @@ class Application():
         """
         pygame.init()
 
-        self.screen = pygame.display.set_mode(DEFAULT_SIZE)
-        pygame.display.set_caption("タイトル")
+        self.screen = pygame.display.set_mode(DEFAULT_SIZE, pygame.FULLSCREEN)
+        pygame.display.set_caption("目指せ！卒業")
         
+        self.bg_img = pygame.image.load(f"images/back_ground.png")
+        self.bg_img = pygame.transform.scale(self.bg_img, (W, H))
+               
         self.clock = pygame.time.Clock()
         self.running = True
     
@@ -148,7 +165,7 @@ class Application():
             self.handle_events()
 
             #背景色描画
-            self.screen.fill((255,255,255))
+            self.screen.blit(self.bg_img, [0, 0])
             
             self.clock.tick(60) #FPS制御
             pygame.display.update() #画面更新
