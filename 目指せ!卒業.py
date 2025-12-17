@@ -304,18 +304,50 @@ class Score:
     打ち落とした爆弾，敵機の数をスコアとして表示するクラス
     爆弾：1点
     敵機：10点
+    Levelは `int(self.value/10)` で算出し，残りはゲージで表示する
     """
     def __init__(self):
-        self.font = pg.font.Font(None, 50)
-        self.color = (0, 0, 255)
-        self.value = 10000
-        self.image = self.font.render(f"Score: {self.value}", 0, self.color)
-        self.rect = self.image.get_rect()
-        self.rect.center = 100, HEIGHT-50
+        self.font = pg.font.Font(None, 36)
+        self.color = (255, 255, 255)
+        self.shadow_color = (0, 0, 0)
+        self.value = 10
+        # テキスト位置
+        self.text_posision = (20, 20)
+        # ゲージ位置とサイズ
+        self.exp_bar_position = (130, 20)
+        self.exp_bar_size = (WIDTH-200, 24)
+        
 
     def update(self, screen: pg.Surface):
-        self.image = self.font.render(f"Score: {self.value}", 0, self.color)
-        screen.blit(self.image, self.rect)
+        # レベルと進捗を計算
+        level = int(self.value / 10)
+        progress = self.value % 10  # 0..9 (10で次レベル)
+
+        # レベル表示（影付き）
+        text = f"Level: {level}"
+        shadow_surface = self.font.render(text, True, self.shadow_color)
+        text_surf = self.font.render(text, True, self.color)
+        screen.blit(shadow_surface, (self.text_posision[0] + 2, self.text_posision[1] + 2))
+        screen.blit(text_surf, self.text_posision)
+
+        # ゲージ描画
+        gx, gy = self.exp_bar_position
+        gw, gh = self.exp_bar_size
+        # 背景
+        bg_rect = pg.Rect(gx, gy, gw, gh)
+        pg.draw.rect(screen, (150, 150, 150), bg_rect)
+        # 進捗フィル
+        fill_w = int((progress / 10) * gw)
+        if fill_w > 0:
+            fill_rect = pg.Rect(gx, gy, fill_w, gh)
+            pg.draw.rect(screen, (50, 200, 50), fill_rect)
+        # 枠線
+        pg.draw.rect(screen, (200, 200, 200), bg_rect, 2)
+
+        # 進捗テキスト（例: 3/10）を右側に表示
+        prog_text = f"{progress}/10"
+        prog_surface = self.font.render(prog_text, True, self.color)
+        screen.blit(prog_surface, (gx + gw + 10, gy - 2))
 
 class EMP(pg.sprite.Sprite):
     """
@@ -416,6 +448,7 @@ def main():
 
     bg_img = pg.image.load(f"fig/back_ground.png")
     bg_img = pg.transform.scale(bg_img, (WIDTH, HEIGHT))
+    # bg_img.set_alpha(10)##残像エフェクト今後の新機能で追加できそう
     
     score = Score()
 
