@@ -245,14 +245,17 @@ class Explosion(pg.sprite.Sprite):
     """
     爆発に関するクラス
     """
-    def __init__(self, obj: "Bomb|Enemy|Bomb_Weapon", life: int):
+    def __init__(self, obj: "Bomb|Enemy|Bomb_Weapon", life: int, clr_change=False):
         """
         爆弾が爆発するエフェクトを生成する
         引数1 obj：爆発するBombまたは敵機インスタンス
         引数2 life：爆発時間
         """
         super().__init__()
-        img = pg.image.load(f"fig/explosion.gif")
+        img = pg.image.load(f"fig/explosion.gif").convert_alpha()
+        if clr_change: #色変更
+            img.fill((255, 0, 255), special_flags=pg.BLEND_RGB_MULT)
+
         self.imgs = [img, pg.transform.flip(img, 1, 1)]
         self.image = self.imgs[0]
         self.rect = self.image.get_rect(center=obj.rect.center)
@@ -754,7 +757,7 @@ def main():
             bb_wep.add(Bomb_Weapon(bird)) #演出用ボムを追加
         for bb in bb_wep:
             if bb.cnt == 1:
-                bb_effect.add(Explosion(bb, 100)) #攻撃判定エフェクトの追加
+                bb_effect.add(Explosion(bb, 100, True)) #攻撃判定エフェクトの追加
 
         #レーザークールダウン
         if tmr % 9 == 0:
@@ -788,11 +791,11 @@ def main():
         #敵との衝突
         for emy, bb_mine in pg.sprite.groupcollide(emys, bb_wep, False, True).items():
             for bb in bb_mine:
-                bb_effect.add(Explosion(bb, 100)) #即座に起爆
+                bb_effect.add(Explosion(bb, 100, True)) #即座に起爆
         #敵攻撃との衝突
         for bb_emy, bb_mine in pg.sprite.groupcollide(bombs, bb_wep, True, True).items():
             for bb in bb_mine:
-                bb_effect.add(Explosion(bb, 100)) #即座に起爆
+                bb_effect.add(Explosion(bb, 100, True)) #即座に起爆
         
         #敵×武器衝突イベント
         #ボム攻撃用エフェクトとの衝突
