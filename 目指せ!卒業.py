@@ -857,7 +857,6 @@ def main():
     sword_recast = 500 #剣の持続カウンタ
 
     swrd_wep.add(Sword_Wepon(bird)) #剣武器追加
-    swrd_se.play(-1) #剣の効果音
 
     clock = pg.time.Clock()
     
@@ -882,6 +881,7 @@ def main():
                     elif event.key == pg.K_RETURN or event.key == pg.K_SPACE:
                         if start_screen.selected == 0:
                             mode = "play"
+                            swrd_se.play(-1) #剣の効果音
                         else:
                             return 0
                 continue
