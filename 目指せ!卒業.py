@@ -48,23 +48,18 @@ class Bird(pg.sprite.Sprite):
     }
 
     def __init__(self, num: int, xy: tuple[int, int]):
-        """
-        こうかとん画像Surfaceを生成する
-        引数1 num：こうかとん画像ファイル名の番号
-        引数2 xy：こうかとん画像の位置座標タプル
-        """
         super().__init__()
         img0 = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 0.9)
-        img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん
+        img = pg.transform.flip(img0, True, False)
         self.imgs = {
-            (+1, 0): img,  # 右
-            (+1, -1): pg.transform.rotozoom(img, 45, 0.9),  # 右上
-            (0, -1): pg.transform.rotozoom(img, 90, 0.9),  # 上
-            (-1, -1): pg.transform.rotozoom(img0, -45, 0.9),  # 左上
-            (-1, 0): img0,  # 左
-            (-1, +1): pg.transform.rotozoom(img0, 45, 0.9),  # 左下
-            (0, +1): pg.transform.rotozoom(img, -90, 0.9),  # 下
-            (+1, +1): pg.transform.rotozoom(img, -45, 0.9),  # 右下
+            (+1, 0): img,
+            (+1, -1): pg.transform.rotozoom(img, 45, 0.9),
+            (0, -1): pg.transform.rotozoom(img, 90, 0.9),
+            (-1, -1): pg.transform.rotozoom(img0, -45, 0.9),
+            (-1, 0): img0,
+            (-1, +1): pg.transform.rotozoom(img0, 45, 0.9),
+            (0, +1): pg.transform.rotozoom(img, -90, 0.9),
+            (+1, +1): pg.transform.rotozoom(img, -45, 0.9),
         }
         self.dire = (+1, 0)
         self.image = self.imgs[self.dire]
@@ -73,6 +68,20 @@ class Bird(pg.sprite.Sprite):
         self.speed = 3
         self.state = "normal"
         self.hyper_life = 0
+
+        self.hp = 10
+        self.playerlv = 1
+
+        # =========================
+        # 機能：アイテム保持スロット（5枠）を実装
+        # - item1〜item5 を「データ」として確実に保持できる形にする
+        # - 外部から関数で安全に変更できるようにする
+        # =========================
+        # 1枠 = {"name": str, "attack": int, "level": int} or None
+        self._items: list[dict | None] = [None] * 5
+
+        # 互換用：既存コードの item1〜item5 を残す（中身は _items と同期）
+        self.item1 = None
         self.dmg_eff_time = 0 #ダメージエフェクトのフレーム管理用
         self.hp=10
         self.item1 = None#武器ランダム
@@ -80,7 +89,79 @@ class Bird(pg.sprite.Sprite):
         self.item3 = None
         self.item4 = None
         self.item5 = None
-        self.playerlv=1
+
+    # =========================
+    # 機能：アイテム操作API（外部から呼ぶ用）
+    # =========================
+    def set_item(self, slot: int, name: str, attack: int = 0, level: int = 1) -> None:
+        """
+        指定スロット(1〜5)にアイテムをセットする
+        """
+        idx = slot - 1
+        if idx < 0 or idx >= 5:
+            raise ValueError("slot は 1〜5 で指定してください")
+
+        self._items[idx] = {"name": name, "attack": int(attack), "level": int(level)}
+        self._sync_item_aliases()
+
+    def get_item(self, slot: int) -> dict | None:
+        """
+        指定スロット(1〜5)のアイテムを取得（無ければNone）
+        """
+        idx = slot - 1
+        if idx < 0 or idx >= 5:
+            raise ValueError("slot は 1〜5 で指定してください")
+        return self._items[idx]
+
+    def clear_item(self, slot: int) -> None:
+        """
+        指定スロット(1〜5)のアイテムを外す
+        """
+        idx = slot - 1
+        if idx < 0 or idx >= 5:
+            raise ValueError("slot は 1〜5 で指定してください")
+        self._items[idx] = None
+        self._sync_item_aliases()
+
+    def swap_items(self, slot_a: int, slot_b: int) -> None:
+        """
+        スロット同士を入れ替える（1〜5）
+        """
+        ia = slot_a - 1
+        ib = slot_b - 1
+        if not (0 <= ia < 5 and 0 <= ib < 5):
+            raise ValueError("slot は 1〜5 で指定してください")
+        self._items[ia], self._items[ib] = self._items[ib], self._items[ia]
+        self._sync_item_aliases()
+
+    def get_items(self) -> list[dict | None]:
+        """
+        全スロットのコピーを返す（外部から直接書き換えされないようにする）
+        """
+        # dictの中身もコピーして返す
+        out = []
+        for it in self._items:
+            out.append(None if it is None else dict(it))
+        return out
+
+    def _sync_item_aliases(self) -> None:
+        """
+        内部保持(_items)と互換変数(item1〜item5)を同期する
+        """
+        self.item1, self.item2, self.item3, self.item4, self.item5 = self._items
+
+    # =========================
+    # 互換：元の関数名を「ちゃんと動く形」にして残す（外部コードが呼んでもOK）
+    # =========================
+    def item_set_(self, item, attack, level):
+        """
+        機能：互換API
+        - 旧仕様の item_set_ を「スロット1にセット」として扱う
+        """
+        self.set_item(1, str(item), attack, level)
+
+
+
 
         if os.path.exists("fig/damage.mp3"):
             self.dmg_sound = pg.mixer.Sound("fig/damage.mp3") #ダメージエフェクト(elseはエラー回避用)
@@ -173,7 +254,7 @@ class Gravity(pg.sprite.Sprite):
         super().__init__()
         self.life = life
         self.alpha = 250
-        
+
         # 1. ベースとなる黒い画面を作成
         self.image = pg.Surface((WIDTH, HEIGHT))
         self.image.set_alpha(self.alpha)
@@ -181,7 +262,7 @@ class Gravity(pg.sprite.Sprite):
 
         # 2. 決めセリフの準備（追加箇所）
         # フォントサイズ80, 赤色(255, 0, 0) で文字を作成
-        self.font = pg.font.Font(None, 100) 
+        self.font = pg.font.Font(None, 100)
         self.text_img = self.font.render("Gravity Zero!", True, (255, 255, 255))
         self.text_rect = self.text_img.get_rect()
         self.text_rect.center = (WIDTH // 2, HEIGHT // 2)
@@ -196,7 +277,7 @@ class Gravity(pg.sprite.Sprite):
 
         # 1. 毎回画面を黒く塗りつぶす（前のフレームの絵を消す）
         pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
-        
+
         # 2. 黒い画面の上に文字を重ねる（追加箇所）
         self.image.blit(self.text_img, self.text_rect)
 
@@ -261,7 +342,7 @@ class Hpbar:
     """
     def __init__(self,bird:Bird):
         self.bird = bird
-        self.max_hp = bird.hp 
+        self.max_hp = bird.hp
         self.width = 200
         self.height = 20
         self.image = pg.Surface((self.width, self.height))
@@ -275,7 +356,7 @@ class Hpbar:
         else:
             current_hp = self.bird.hp
         ratio = current_hp / self.max_hp  # 現在HPの割合
-        green_width = int(self.width * ratio)  
+        green_width = int(self.width * ratio)
         pg.draw.rect(self.image, (0, 255, 0), (0, 0, green_width, self.height)) #HP緑部分
         pg.draw.rect(self.image, (255, 255, 255), (0, 0, self.width, self.height), 2) #枠
         screen.blit(self.image, self.rect) #ダメージ食らった割合
@@ -302,7 +383,7 @@ class Score:
         # ゲージ位置とサイズ
         self.exp_bar_position = (130, 20)
         self.exp_bar_size = (WIDTH-200, 24)
-        
+
 
     def update(self, screen: pg.Surface):
         # レベルと進捗を計算
@@ -512,7 +593,7 @@ class starting:
 #         self.display_position=(60,HEIGHT-90)
 #         self.display_size=(WIDTH-200,HEIGHT-30)
 #         self.image=pg.image.transform.rotozoom("fig/serihu_pass_icon.png",180,0.1)
-    
+
 #     def update(self,screen:pg.Surface):
 #         text=["よくもやってくれたな...","貴様のその行い万死に値する...","判決を言い渡す...","退学だ"]
 
@@ -531,7 +612,7 @@ class Bomb_Weapon(pg.sprite.Sprite):
         引数：Birdインスタンス
         """
         super().__init__()
-        
+
         #画像設定
         self.image = pg.image.load("fig/bomb.png")
         self.image = pg.transform.scale(self.image, (100, 100))
@@ -543,7 +624,7 @@ class Bomb_Weapon(pg.sprite.Sprite):
         self.lv = 1 #レベル
         self.atk = 5 #攻撃力
         self.cnt = 100 #表示時間
-    
+
     def update(self, screen: pg.Surface):
         """
         描画処理
@@ -552,7 +633,7 @@ class Bomb_Weapon(pg.sprite.Sprite):
         """
         self.cnt -= 1
         screen.blit(self.image, self.rect) #自己描画
-        
+
         #カウンタが0になったら削除
         if self.cnt == 0:
             self.kill()
@@ -568,7 +649,7 @@ class Laser_Weapon(pg.sprite.Sprite):
         引数：Birdインスタンス
         """
         super().__init__()
-        
+
         #角度設定
         self.vx, self.vy = bird.dire #鳥の角度を取得
         angle = math.degrees(math.atan2(-self.vy, self.vx)) #レーザーの角度の設定
@@ -590,7 +671,7 @@ class Laser_Weapon(pg.sprite.Sprite):
         self.lv = 1 #レベル
         self.atk = 1 #攻撃力
         self.speed = 10 #レーザーの速さ
-    
+
     def update(self):
         """
         描画処理
@@ -614,7 +695,7 @@ class Missile_Weapon(pg.sprite.Sprite):
         引数：Birdインスタンス, Enemyオブジェクトを格納するsprite.Group
         """
         super().__init__()
-        
+
         #ターゲット設定
         self.target = None
         min_dist = float("inf") #最小を格納する変数(初期値：無限)
@@ -622,9 +703,9 @@ class Missile_Weapon(pg.sprite.Sprite):
         for emy in emys:
             dx = emy.rect.centerx - bird.rect.centerx #距離との差x
             dy = emy.rect.centery - bird.rect.centery #距離との差y
-            
+
             dist = math.sqrt(dx**2 + dy**2) #鳥と敵の直線距離
-            
+
             #最小の上書き
             if dist < min_dist:
                 min_dist = dist
@@ -641,7 +722,7 @@ class Missile_Weapon(pg.sprite.Sprite):
         #画像設定
         self.base_image = pg.image.load("fig/missile.png")
         self.base_image = pg.transform.scale(self.base_image, (100, 50))
-        
+
         self.image = self.base_image
         self.rect = self.image.get_rect() #Rect取得
         self.rect.center = bird.rect.center #Rectの中央を鳥のRectの中央に合わせる
@@ -649,8 +730,8 @@ class Missile_Weapon(pg.sprite.Sprite):
         #ステータス設定
         self.lv = 1 #レベル
         self.atk = 10 #攻撃力
-        self.spd = 20 #速度        
-    
+        self.spd = 20 #速度
+
     def update(self):
         """
         描画処理
@@ -660,7 +741,7 @@ class Missile_Weapon(pg.sprite.Sprite):
         if not (self.target and self.target.alive()):
             self.kill()
             return
-        
+
         #敵の中心とミサイル中心のx,y成分
         dx = self.target.rect.centerx - self.rect.centerx
         dy = self.target.rect.centery - self.rect.centery
@@ -668,7 +749,7 @@ class Missile_Weapon(pg.sprite.Sprite):
         norm = math.sqrt(dx*dx + dy*dy)
         if norm == 0:
             return
-        
+
         #正規化処理(vx + vy = 1)
         self.vx = dx / norm
         self.vy = dy / norm
@@ -717,7 +798,7 @@ class Gun_Weapon(pg.sprite.Sprite):
         self.lv = 1 #レベル
         self.atk = 1 #攻撃力
         self.speed = 10 #弾速
-    
+
     def update(self):
         """
         描画処理
@@ -729,7 +810,7 @@ class Gun_Weapon(pg.sprite.Sprite):
         #画面外への移動で削除
         if check_bound(self.rect) != (True, True):
             self.kill()
-            
+
 class Sword_Wepon(pg.sprite.Sprite):
     """
     円の軌道で周回する武器に関するクラス
@@ -740,23 +821,23 @@ class Sword_Wepon(pg.sprite.Sprite):
         引数：Birdインスタンス
         """
         super().__init__()
-        
+
         self.bird = bird
         self.angle = 0.0 #初期化角度
-        
+
         #画像設定
         self.base_image = pg.image.load("fig/sword.png")
         self.base_image = pg.transform.scale(self.base_image, (100, 100))
-        
+
         self.image = self.base_image
         self.rect = self.image.get_rect() #Rect取得
-        
+
         #ステータス設定
         self.lv = 1 #レベル
         self.atk = 5 #攻撃力
         self.radius = 100 #周回半径
         self.spd = 0.07 #周回速度
-        
+
     def update(self):
         """
         描画処理
@@ -764,12 +845,12 @@ class Sword_Wepon(pg.sprite.Sprite):
         """
         self.angle += self.spd #角度の変化
         cx, cy  = self.bird.rect.center #鳥の中心を取得
-        
+
         #中心座標の決定
         x = cx + self.radius * math.cos(self.angle)
         y = cy + self.radius * math.sin(self.angle)
         center = (x, y)
-        
+
         #画像角度の決定
         dx = x - cx
         dy = y - cy
@@ -777,8 +858,8 @@ class Sword_Wepon(pg.sprite.Sprite):
 
         #画像角度の変更
         self.image = pg.transform.rotate(self.base_image, image_angle)
-        self.rect = self.image.get_rect(center=center)          
-        
+        self.rect = self.image.get_rect(center=center)
+
 class Enemy(pg.sprite.Sprite):
     """
     Enemy の Docstring
@@ -789,7 +870,7 @@ class Enemy(pg.sprite.Sprite):
         Enemy の Docstring
         """
         super().__init__()
-        
+
         wave = lv // 3
         if lv >= 15:wave = 4
         enemy_fid_dic = {0: "fig/report.png", 1: "fig/clock.png", 2: "fig/ai.png", 3: "fig/guard.png", 4: "fig/teacher.png"}
@@ -824,16 +905,16 @@ class LastBoss(Enemy):
     """
     def __init__(self):
         super().__init__(15)  # レベル設定（画像決定用、中身は何でも良い）
-        
+
         # 画面を埋め尽くすサイズに画像を拡大 (元の画像を2倍にするなど)
         original_img = pg.image.load(f"fig/fantasy_maou_devil.png")
-        self.image = pg.transform.rotozoom(original_img, 0, 2.5) 
+        self.image = pg.transform.rotozoom(original_img, 0, 2.5)
         self.stats = [10000000000, 50, 20, 1]  # HP, attack, defense, speed
-        
+
         self.rect = self.image.get_rect()
         self.rect.centerx = WIDTH / 2  # 横位置は画面中央
         self.rect.bottom = 0           # 初期位置は画面の上外
-        
+
         self.pos = pg.Vector2(self.rect.center)
         self.speed = 1  # じりじりと襲ってくる（低速）
 
@@ -843,7 +924,7 @@ class LastBoss(Enemy):
         """
         self.pos.y += self.speed
         self.rect.centery = int(self.pos.y)
-        
+
         # 画面下まで来たら止まる（あるいはゲームオーバー判定など）
         if self.rect.top > HEIGHT:
             self.rect.top = HEIGHT  # とりあえず止める処理
@@ -863,16 +944,16 @@ def main():
     exp_se = pg.mixer.Sound("sound/bb_effct.wav")
     exp_se.set_volume(0.2)
     gun_se = pg.mixer.Sound("sound/gun.wav")
-    gun_se.set_volume(0.1)    
+    gun_se.set_volume(0.1)
     laser_se = pg.mixer.Sound("sound/laser.wav")
     laser_se.set_volume(0.1)
     mssl_se = pg.mixer.Sound("sound/mssle.wav")
     mssl_se.set_volume(0.4)
     swrd_se = pg.mixer.Sound("sound/sword.wav")
-    swrd_se.set_volume(1)    
+    swrd_se.set_volume(1)
 
     # bg_img.set_alpha(10)##残像エフェクト今後の新機能で追加できそう
-    
+
     score = Score()
     start_screen = starting()
     mode = "start"  # "start" or "play"
@@ -880,7 +961,7 @@ def main():
     bird = Bird(3, (900, 400))
     hpbar = Hpbar(bird)
 
-    
+
     bb_wep = pg.sprite.Group() #ボムの武器のグループ
     bb_effect = pg.sprite.Group() #ボム演出後の攻撃用エフェクトグループ
     lsr_wep = pg.sprite.Group() #レーザー武器のグループ
@@ -901,7 +982,7 @@ def main():
 
     swrd_wep.add(Sword_Wepon(bird)) #剣武器追加
     swrd_se.play(-1)
-    
+
     flag = False
 
     clock = pg.time.Clock()
@@ -968,7 +1049,7 @@ def main():
 
         if tmr % 20 == 0 and not ending:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy(score.value / 10))
-            
+
         #武器処理
         #爆弾クールダウン
         if tmr % 150 == 0 and tmr != 0:
@@ -983,13 +1064,13 @@ def main():
         #レーザークールダウン
         if tmr % 9 == 0:
             laser_power -= 1
-            
+
             if laser_power > 80: #射出上限
                 lsr_wep.add(Laser_Weapon(bird)) #レーザー武器追加
                 laser_se.play()
             elif laser_power == 0:
                 laser_power = 100 #初期化
-                
+
         #ミサイルクールダウン
         if tmr % 100 == 0:
             mssl_wep.add(Missile_Weapon(bird, emys)) #ミサイル武器追加
@@ -1028,7 +1109,7 @@ def main():
                 bb_effect.add(Explosion(bb, 100, True)) #即座に起爆
 
                 exp_se.play()
-        
+
         #敵×武器衝突イベント
         if not ending:
             #ボム攻撃用エフェクトとの衝突
@@ -1050,16 +1131,16 @@ def main():
             #周回軌道武器との衝突
             for emy in pg.sprite.groupcollide(emys, swrd_wep, True, False).keys():
                 exps.add(Explosion(emy, 100))
-                score.value += 1                              
+                score.value += 1
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
-            
+
             bird.change_img(6, screen)  # こうかとん喜びエフェクト
         if score.value >= 150 and not ending:
             if flag == False:
                 emys.empty()
-                
+
                 bb_wep.empty()
                 gun_wep.empty()
                 lsr_wep.empty()
@@ -1070,7 +1151,7 @@ def main():
             gravity.add(Gravity(400))
             ending = True
             emys.add(LastBoss())
-        
+
         if tmr % 50 == 0 and not ending:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy(score.value / 10))
 
@@ -1081,7 +1162,7 @@ def main():
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
-            
+
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
@@ -1095,7 +1176,7 @@ def main():
         
         for bomb in pg.sprite.groupcollide(bombs, gravity, True, False).keys():  # 力場と衝突した爆弾リスト
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-            
+
             score.value += 1  # 1点アップ
 
             bird.change_img(6, screen)  # こうかとん喜びエフェクト
@@ -1104,7 +1185,7 @@ def main():
             for emy in pg.sprite.spritecollide(bird, emys, True):  # こうかとんと衝突した爆弾リスト
                 if bird.state == "hyper":
                     exps.add(Explosion(emy, 50))  # 爆発エフェクト
-                
+
                 else: #敵と衝突したら？
                     bird.hp-=1 #HPが減る
                     emy.kill()
@@ -1119,7 +1200,7 @@ def main():
                 if bird.dmg_eff_time and bird.dmg_sound is not None:
                     bird.dmg_sound.play()
 
-                
+
         if bird.hp<=0:
             #ゲームオーバー
             bird.change_img(8, screen)  # こうかとん悲しみエフェクト
@@ -1132,7 +1213,7 @@ def main():
         score.update(screen)
         gravity.update()
         gravity.draw(screen)
-        bird.update(key_lst, screen)        
+        bird.update(key_lst, screen)
         bb_wep.update(screen)
         bb_effect.update()
         bb_effect.draw(screen)
